@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package>
+  <name>biped_state_estimator</name>
+  <version>1.0.0</version>
+  <description>Estimates the state of the robot in the world model based on leg odometry and IMU data.</description>
+
+  <maintainer email="oehler@sim.tu-darmstadt.de">Martin Oehler</maintainer>
+  <license>GPLv3</license>
+  <!-- <url type="website">http://wiki.ros.org/biped_state_estimator</url> -->
+  <author email="oehler@sim.tu-darmstadt.de">Martin Oehler</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>cmake_modules</build_depend>
+  <build_depend>robot_transforms</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <run_depend>roscpp</run_depend>
+  <run_depend>robot_transforms</run_depend>
+  <run_depend>geometry_msgs</run_depend>
+</package>
