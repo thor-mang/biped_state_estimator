@@ -6,6 +6,7 @@
 #include <robot_transforms/robot_transforms.h>
 #include <boost/shared_ptr.hpp>
 #include <geometry_msgs/PoseStamped.h>
+#include <std_msgs/String.h>
 
 
 #include <cmath>
@@ -38,12 +39,12 @@ typedef struct Pose
 
 } Pose;
 
-namespace Thor {
+namespace robot_tools {
 class StateEstimator {
 public:
 	// Init
 	StateEstimator();
-	bool init(ros::NodeHandle& nh);
+	bool init(ros::NodeHandle nh);
 
 	// Input
 	void setFeetForceZ(const double& left_z, const double& right_z);
@@ -59,13 +60,18 @@ public:
 
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 private:
+	void reset();
 	void setSupportFoot(std::string foot_name);
 	Eigen::Vector3d getLeftToRightDistance();
 	double getFootHeight(std::string foot_name);
 
 	void publishPelvisWorldPose();
+	void sysCommandCb(const std_msgs::StringConstPtr& msg);
 
 	ros::Publisher pelvis_pose_pub_;
+	ros::Subscriber syscmd_sub_;
+
+	bool initialized_;
 
 	ros::NodeHandle nh_;								// Node handle in which the state estimator is running
 	Eigen::Quaterniond world_orientation_; // Orientation of the robot pelvis relative to world frame

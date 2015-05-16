@@ -1,12 +1,24 @@
 #include <biped_state_estimator/biped_state_estimator.h>
 
-namespace Thor {
+namespace robot_tools {
 // Init
-StateEstimator::StateEstimator() {
+StateEstimator::StateEstimator():
+	world_orientation_(Eigen::Quaterniond::Identity()),
+	world_position_(Eigen::Vector3d::Zero()),
+	left_force_(0.0),
+	right_force_(0.0),
+	pelvis_name_(""),
+	right_foot_name_(""),
+	left_foot_name_(""),
+	ground_point_(Eigen::Vector3d::Zero()),
+	height_treshold_passed_(false),
+	height_treshold_(0.0),
+	initialized_(false)
+{
 
 }
 
-bool StateEstimator::init(ros::NodeHandle &nh) {
+bool StateEstimator::init(ros::NodeHandle nh) {
 	// Load params
 	nh_ = nh;
 	nh.param("pelvis_name", pelvis_name_, std::string("pelvis"));
@@ -27,8 +39,10 @@ bool StateEstimator::init(ros::NodeHandle &nh) {
 	imu_ = IMU();
 
 	pelvis_pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("pelvis_pose", 1000);
+	syscmd_sub_ = nh.subscribe<std_msgs::String>("/syscommand", 1000, &StateEstimator::sysCommandCb, this);
 
 	ROS_INFO("State estimation initialized.");
+	initialized_ = true;
 	return true;
 }
 
@@ -59,6 +73,8 @@ std::string StateEstimator::getSupportFoot() {
 
 // Update
 void StateEstimator::update() {
+	if (!initialized_) return;
+
 	double left_height = getFootHeight(left_foot_name_);
 	double right_height = getFootHeight(right_foot_name_);
 
@@ -77,10 +93,20 @@ void StateEstimator::update() {
 	world_orientation_ = imu_.orientation;
 	Eigen::Vector3d support_foot_to_pelvis = -robot_transforms_ptr_->getTransform(support_foot_).translation();
 	world_position_ = ground_point_ + support_foot_to_pelvis;
+
+	publishPelvisWorldPose();
 }
 
 
 // Private
+void StateEstimator::reset() {
+	if (initialized_) {
+		init(nh_);
+	} else {
+		ROS_WARN("Can't reset state estimation before init() was called!");
+	}
+}
+
 Eigen::Vector3d StateEstimator::getLeftToRightDistance() {
 	Eigen::Vector3d left_pos = robot_transforms_ptr_->getTransform(left_foot_name_).translation();
 	Eigen::Vector3d right_pos = robot_transforms_ptr_->getTransform(right_foot_name_).translation();
@@ -130,4 +156,13 @@ void StateEstimator::publishPelvisWorldPose() {
 
 	pelvis_pose_pub_.publish(pose);
 }
+
+void StateEstimator::sysCommandCb(const std_msgs::StringConstPtr& msg) {
+	if (msg->data == "reset") {
+		reset();
+	} else {
+		ROS_WARN_STREAM("[StateEstimator] Unknown syscommand '" << msg->data << "'.");
+	}
+}
+
 } // namespace Thor
