@@ -80,7 +80,7 @@ void StateEstimator::update() {
 
 	double difference = left_height - right_height;
 
-	std::string lower_foot = difference < 0 ? "left_foot" : "right_foot";
+	std::string lower_foot = difference < 0 ? left_foot_name_ : right_foot_name_;
 	if (std::abs(difference) > height_treshold_ && !height_treshold_passed_) {
 		height_treshold_passed_ = true;
 		ROS_INFO_STREAM("Height threshold passed.");
