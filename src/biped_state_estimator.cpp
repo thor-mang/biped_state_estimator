@@ -89,6 +89,7 @@ void StateEstimator::update() {
 		height_treshold_passed_ = false;
 		setSupportFoot(lower_foot);
 	}
+	if (support_foot_ == "undefined") return;
 
 	world_orientation_ = imu_.orientation;
 	Eigen::Vector3d support_foot_to_pelvis = -robot_transforms_ptr_->getTransform(support_foot_).translation();
