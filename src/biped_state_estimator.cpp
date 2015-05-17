@@ -83,7 +83,7 @@ void StateEstimator::update() {
 		// otherwise just take a random foot
 		pelvis_to_support_foot = robot_transforms_ptr_->getTransform(left_foot_name_);
 	}
-	world_pose_.orientation = pelvis_to_support_foot.linear().inverse() * ground_point_.orientation;
+	world_pose_.orientation = ground_point_.orientation * pelvis_to_support_foot.linear().inverse();
 	Eigen::Vector3d support_foot_to_pelvis_trans = -pelvis_to_support_foot.translation();
 	world_pose_.position = ground_point_.position + imu_.orientation * support_foot_to_pelvis_trans;
 
