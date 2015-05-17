@@ -54,8 +54,8 @@ void StateEstimator::setIMU(double (&orientation_no_yaw)[4], double (&angular_ve
 	imu_.linear_acceleration = Eigen::Vector3d(linear_acceleration[0], linear_acceleration[1], linear_acceleration[2]);
 }
 
-void StateEstimator::setRobotTransforms(robot_tools::RobotTransforms& transforms) {
-	robot_transforms_ptr_.reset(&transforms);
+void StateEstimator::setRobotTransforms(boost::shared_ptr<RobotTransforms> transforms_ptr) {
+	robot_transforms_ptr_ = transforms_ptr;
 }
 
 // Output

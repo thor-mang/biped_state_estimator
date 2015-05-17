@@ -49,7 +49,7 @@ public:
 	// Input
 	void setFeetForceZ(const double& left_z, const double& right_z);
 	void setIMU(double (&orientation)[4], double (&angular_velocity)[3], double (&linear_acceleration)[3]);
-	void setRobotTransforms(robot_tools::RobotTransforms& transforms);
+	void setRobotTransforms(boost::shared_ptr<robot_tools::RobotTransforms> transforms_ptr);
 
 	// Output
 	Pose getPelvisPose();
