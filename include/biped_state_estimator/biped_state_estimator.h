@@ -61,9 +61,10 @@ public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 private:
 	void reset();
+	bool checkSupportFootChange();
 	void setSupportFoot(std::string foot_name);
-	Eigen::Vector3d getLeftToRightDistance();
 	double getFootHeight(std::string foot_name);
+	std::string otherFoot(std::string foot_name);
 
 	void publishPelvisWorldPose();
 	void sysCommandCb(const std_msgs::StringConstPtr& msg);
@@ -73,12 +74,11 @@ private:
 
 	bool initialized_;
 
-	ros::NodeHandle nh_;								// Node handle in which the state estimator is running
-	Eigen::Quaterniond world_orientation_; // Orientation of the robot pelvis relative to world frame
-	Eigen::Vector3d world_position_;    // Position of the robot pelvis relative to world frame
-	std::string support_foot_;					// Foot on groud: 'right_foot' or 'left_foot'
-	double height_treshold_;						// The non-supporting foot has to pass this limit before it can be a supporting foot again
-	Eigen::Vector3d ground_point_;		  // Contact point of the robot with the world. Moves with each step.
+	ros::NodeHandle nh_;				// Node handle in which the state estimator is running
+	Pose world_pose_;						// Pose of the robot pelvis relative to world frame
+	std::string support_foot_;	// Foot on groud: 'right_foot' or 'left_foot'
+	double height_treshold_;		// The non-supporting foot has to pass this limit before it can be a supporting foot again
+	Pose ground_point_;					// Contact point of the robot with the world. Moves with each step.
 
 	bool height_treshold_passed_;				// True if the non-supporting foot was higher than the threshold relative to the supporting foot
 
