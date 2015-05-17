@@ -30,7 +30,8 @@ bool StateEstimator::init(ros::NodeHandle nh) {
 	support_foot_ = "undefined"; // Starting in double support
 	world_orientation_ = Eigen::Quaterniond::Identity();
 	world_position_ = Eigen::Vector3d::Zero();
-	ground_point_ = Eigen::Vector3d::Zero();	// Init when first leg leaves ground.
+	ground_point_ = imu_.orientation * robot_transforms_ptr_->getTransform(left_foot_name_).translation();
+	ground_point_.z() = 0;
 
 	height_treshold_passed_ = false;
 
@@ -52,8 +53,8 @@ void StateEstimator::setFeetForceZ(const double& left_z, const double& right_z) 
 	right_force_ = right_z;
 }
 
-void StateEstimator::setIMU(double (&orientation)[4], double (&angular_velocity)[3], double (&linear_acceleration)[3]) {
-	imu_.orientation = Eigen::Quaterniond(orientation[3], orientation[0], orientation[1], orientation[2]);
+void StateEstimator::setIMU(double (&orientation_no_yaw)[4], double (&angular_velocity)[3], double (&linear_acceleration)[3]) {
+	imu_.orientation = Eigen::Quaterniond(orientation_no_yaw[3], orientation_no_yaw[0], orientation_no_yaw[1], orientation_no_yaw[2]);
 	imu_.angular_velocity = Eigen::Vector3d(angular_velocity[0], angular_velocity[1], angular_velocity[2]);
 	imu_.linear_acceleration = Eigen::Vector3d(linear_acceleration[0], linear_acceleration[1], linear_acceleration[2]);
 }
@@ -89,11 +90,17 @@ void StateEstimator::update() {
 		height_treshold_passed_ = false;
 		setSupportFoot(lower_foot);
 	}
-	if (support_foot_ == "undefined") return;
-
-	world_orientation_ = imu_.orientation;
-	Eigen::Vector3d support_foot_to_pelvis = -robot_transforms_ptr_->getTransform(support_foot_).translation();
-	world_position_ = ground_point_ + support_foot_to_pelvis;
+	Eigen::Affine3d pelvis_to_support_foot;
+	if (support_foot_ != "undefined") {
+		// if we know a support foot, get the transform
+		pelvis_to_support_foot = robot_transforms_ptr_->getTransform(support_foot_);
+	} else {
+		// otherwise just take a random foot
+		pelvis_to_support_foot = robot_transforms_ptr_->getTransform(left_foot_name_);
+	}
+	world_orientation_ = imu_.orientation * pelvis_to_support_foot.linear().inverse();
+	Eigen::Vector3d support_foot_to_pelvis_trans = -pelvis_to_support_foot.translation();
+	world_position_ = ground_point_ + imu_.orientation * support_foot_to_pelvis_trans;
 
 	publishPelvisWorldPose();
 }
