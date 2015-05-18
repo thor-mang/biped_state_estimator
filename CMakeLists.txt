@@ -9,6 +9,8 @@ find_package(catkin REQUIRED COMPONENTS
   cmake_modules
   robot_transforms
   geometry_msgs
+  sensor_msgs
+  kdl_parser
 )
 
 ## System dependencies are found with CMake's conventions
@@ -87,6 +89,8 @@ catkin_package(
     roscpp
     robot_transforms
     geometry_msgs
+    sensor_msgs
+    kdl_parser
 #  DEPENDS system_lib
 )
 
@@ -115,7 +119,7 @@ include_directories(
 add_library(${PROJECT_NAME} ${HEADERS} ${SOURCES})
 
 ## Declare a cpp executable
-# add_executable(biped_state_estimator_node src/biped_state_estimator_node.cpp)
+add_executable(state_estimator_test src/state_estimator_test.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -123,6 +127,7 @@ add_dependencies(${PROJECT_NAME} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
+target_link_libraries(state_estimator_test ${PROJECT_NAME} ${catkin_LIBRARIES})
 
 #############
 ## Install ##

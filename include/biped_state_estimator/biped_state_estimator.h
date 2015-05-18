@@ -44,10 +44,15 @@ class StateEstimator {
 public:
 	// Init
 	StateEstimator();
-	bool init(ros::NodeHandle nh);
+	bool init(ros::NodeHandle nh, bool reset_on_start=false);
+	void reset();
 
 	// Input
 	void setFeetForceZ(const double& left_z, const double& right_z);
+	/**
+	 * @brief setIMU
+	 * @param orientation Orientation as quaternion(x,y,z,w)
+	 */
 	void setIMU(double (&orientation)[4], double (&angular_velocity)[3], double (&linear_acceleration)[3]);
 	void setRobotTransforms(boost::shared_ptr<robot_tools::RobotTransforms> transforms_ptr);
 
@@ -57,27 +62,32 @@ public:
 
 	// Update
 	void update();
+	void update(ros::Time current_time);
 
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 private:
-	void reset();
 	bool checkSupportFootChange();
 	void setSupportFoot(std::string foot_name);
 	double getFootHeight(std::string foot_name);
 	std::string otherFoot(std::string foot_name);
 
-	void publishPelvisWorldPose();
+	void publishPelvisWorldPose(ros::Time current_time);
+	void publishGroundPoint(ros::Time current_time);
+	void publishPose(const Pose& pose, const ros::Publisher& pub, ros::Time current_time) const;
 	void sysCommandCb(const std_msgs::StringConstPtr& msg);
 
 	ros::Publisher pelvis_pose_pub_;
+	ros::Publisher ground_point_pub_;
 	ros::Subscriber syscmd_sub_;
 
 	bool initialized_;
 
 	ros::NodeHandle nh_;				// Node handle in which the state estimator is running
 	Pose world_pose_;						// Pose of the robot pelvis relative to world frame
+	double yaw_;
 	std::string support_foot_;	// Foot on groud: 'right_foot' or 'left_foot'
 	double height_treshold_;		// The non-supporting foot has to pass this limit before it can be a supporting foot again
+	double ankle_z_offset_;
 	Pose ground_point_;					// Contact point of the robot with the world. Moves with each step.
 
 	bool height_treshold_passed_;				// True if the non-supporting foot was higher than the threshold relative to the supporting foot

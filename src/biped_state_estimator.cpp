@@ -1,5 +1,7 @@
 #include <biped_state_estimator/biped_state_estimator.h>
 
+#include <kdl/frames.hpp>
+
 namespace robot_tools {
 // Init
 StateEstimator::StateEstimator():
@@ -10,35 +12,37 @@ StateEstimator::StateEstimator():
 	left_foot_name_(""),
 	height_treshold_passed_(false),
 	height_treshold_(0.0),
-	initialized_(false)
+	initialized_(false),
+	ankle_z_offset_(0.0),
+	yaw_(0.0)
 {}
 
-bool StateEstimator::init(ros::NodeHandle nh) {
+bool StateEstimator::init(ros::NodeHandle nh, bool reset_on_start) {
+	if (!robot_transforms_ptr_) {
+		ROS_ERROR("[StateEstimation] Robot Transforms wasn't set. Can't initialize");
+		return false;
+	}
 	// Load params
 	nh_ = nh;
 	nh.param("pelvis_name", pelvis_name_, std::string("pelvis"));
 	nh.param("right_foot_name", right_foot_name_, std::string("r_foot"));
 	nh.param("left_foot_name", left_foot_name_, std::string("l_foot"));
 	nh.param("height_treshold", height_treshold_, 0.05);
-
-	// Init state estimation
-	support_foot_ = "undefined"; // Starting in double support
-	world_pose_ = Pose();
-	ground_point_.orientation = imu_.orientation * robot_transforms_ptr_->getTransform(left_foot_name_).linear();
-	ground_point_.position = imu_.orientation * robot_transforms_ptr_->getTransform(left_foot_name_).translation();
-	ground_point_.position.z() = 0;
-
-	height_treshold_passed_ = false;
+	nh.param("ankle_z_offset", ankle_z_offset_, 0.118);
 
 	left_force_ = 0;
 	right_force_ = 0;
 	imu_ = IMU();
 
 	pelvis_pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("pelvis_pose", 1000);
+	ground_point_pub_ = nh.advertise<geometry_msgs::PoseStamped>("ground_point", 1000);
 	syscmd_sub_ = nh.subscribe<std_msgs::String>("/syscommand", 1000, &StateEstimator::sysCommandCb, this);
 
 	ROS_INFO("State estimation initialized.");
 	initialized_ = true;
+	if (reset_on_start) {
+		reset();
+	}
 	return true;
 }
 
@@ -68,33 +72,41 @@ std::string StateEstimator::getSupportFoot() {
 }
 
 // Update
-void StateEstimator::update() {
+void StateEstimator::update(ros::Time current_time) {
 	if (!initialized_) return;
 
 	if (checkSupportFootChange()) {
 		setSupportFoot(otherFoot(support_foot_));
 	}
 
-	Eigen::Affine3d pelvis_to_support_foot;
-	if (support_foot_ != "undefined") {
-		// if we know a support foot, get the transform
-		pelvis_to_support_foot = robot_transforms_ptr_->getTransform(support_foot_);
-	} else {
-		// otherwise just take a random foot
-		pelvis_to_support_foot = robot_transforms_ptr_->getTransform(left_foot_name_);
-	}
-	world_pose_.orientation = ground_point_.orientation * pelvis_to_support_foot.linear().inverse();
+	Eigen::Affine3d pelvis_to_support_foot = robot_transforms_ptr_->getTransform(support_foot_);
+	world_pose_.orientation = imu_.orientation * ground_point_.orientation * pelvis_to_support_foot.linear().inverse();
+
 	Eigen::Vector3d support_foot_to_pelvis_trans = -pelvis_to_support_foot.translation();
 	world_pose_.position = ground_point_.position + imu_.orientation * support_foot_to_pelvis_trans;
 
-	publishPelvisWorldPose();
+	publishPelvisWorldPose(current_time);
+	publishGroundPoint(current_time);
+}
+
+void StateEstimator::update() {
+	update(ros::Time::now());
 }
 
 
 // Private
 void StateEstimator::reset() {
 	if (initialized_) {
-		init(nh_);
+		height_treshold_passed_ = false;
+		// Init state estimation
+		support_foot_ = left_foot_name_; // Starting in double support
+		world_pose_ = Pose();
+		ground_point_.orientation = Eigen::Quaterniond::Identity(); //imu_.orientation * robot_transforms_ptr_->getTransform(left_foot_name_).linear();
+		// ROS_INFO_STREAM("Initializing orientation to: " << ground_point_.orientation.x() << ", " <<  ground_point_.orientation.y() << ", " <<  ground_point_.orientation.z() << ", " <<  ground_point_.orientation.w());
+		ground_point_.position = imu_.orientation * robot_transforms_ptr_->getTransform(left_foot_name_).translation();
+		ground_point_.position.z() = ankle_z_offset_;
+		yaw_ = 0.0;
+		ROS_INFO_STREAM("[StateEstimator] Reset.");
 	} else {
 		ROS_WARN("Can't reset state estimation before init() was called!");
 	}
@@ -109,7 +121,7 @@ bool StateEstimator::checkSupportFootChange() {
 	std::string lower_foot = difference < 0 ? left_foot_name_ : right_foot_name_;
 	if (std::abs(difference) > height_treshold_ && !height_treshold_passed_) {
 		height_treshold_passed_ = true;
-		ROS_INFO_STREAM("Height threshold passed.");
+		// ROS_INFO_STREAM("Height threshold passed.");
 	}
 	if (lower_foot != support_foot_ && height_treshold_passed_) {
 		height_treshold_passed_ = false;
@@ -127,20 +139,24 @@ std::string StateEstimator::otherFoot(std::string foot_name) {
 }
 
 void StateEstimator::setSupportFoot(std::string foot_name) {
-	ROS_INFO_STREAM("Changing support foot to: " << foot_name);
-	if (support_foot_ == "undefined") {
-		// init ground position to supporting foot
-		ground_point_.orientation = imu_.orientation * robot_transforms_ptr_->getTransform(foot_name).linear();
-		ground_point_.position = imu_.orientation * robot_transforms_ptr_->getTransform(foot_name).translation();
-		ground_point_.position.z() = 0;
-		ROS_INFO_STREAM("Initializing ground_point to: " << ground_point_.position.x() << ", " << ground_point_.position.y() << ", " << ground_point_.position.z());
-	} else {
-		// add distance between feet to ground position
-		ground_point_.orientation = (ground_point_.orientation * robot_transforms_ptr_->getTransform(support_foot_, foot_name).linear()).eval();
-		ground_point_.position += robot_transforms_ptr_->getTransform(support_foot_, foot_name).translation();
-		ROS_INFO_STREAM("Moving ground_point to: " << ground_point_.position.x() << ", " << ground_point_.position.y() << ", " << ground_point_.position.z());
-	}
+	// add distance between feet to ground position
+	Eigen::Affine3d foot_to_foot = robot_transforms_ptr_->getTransform(support_foot_, foot_name);
+	ground_point_.position += foot_to_foot.translation();
+	ground_point_.position.z() =  + ankle_z_offset_; // fix foot to ground again
 
+	// extract yaw
+	Eigen::Quaterniond foot_rot_quad(foot_to_foot.rotation());
+	KDL::Rotation rot = KDL::Rotation::Quaternion(foot_rot_quad.x(), foot_rot_quad.y(), foot_rot_quad.z(), foot_rot_quad.w());
+	double roll, pitch, yaw;
+	rot.GetRPY(roll, pitch, yaw);
+	yaw_ += yaw;
+
+	ground_point_.orientation = Eigen::AngleAxisd(yaw_, Eigen::Vector3d::UnitZ());
+
+	//Eigen::Vector3d d = robot_transforms_ptr_->getTransform(support_foot_, foot_name).translation();
+	ROS_INFO_STREAM("Switching support foot from " << support_foot_ << " to " << foot_name << "."); // << std::endl <<
+	//								"Displacement: " << std::endl << d.x() << ", " << d.y() << ", " << d.z());
+	ROS_INFO_STREAM("rpy: " << roll << ", " << pitch << ", " << yaw);
 	support_foot_ = foot_name;
 }
 
@@ -149,24 +165,32 @@ double StateEstimator::getFootHeight(std::string foot_name) {
 	Eigen::Affine3d pose	= robot_transforms_ptr_->getTransform(foot_name);
 	Eigen::Vector3d position = pose.translation();
 	Eigen::Vector3d world_position = imu_.orientation * position;
-	return -world_position.z();
+	return world_position.z();
 }
 
-void StateEstimator::publishPelvisWorldPose() {
-	geometry_msgs::PoseStamped pose;
-	pose.header.frame_id = "world";
-	pose.header.stamp = ros::Time::now();
+void StateEstimator::publishPose(const Pose& pose, const ros::Publisher& pub, ros::Time current_time) const {
+	geometry_msgs::PoseStamped pose_msg;
+	pose_msg.header.frame_id = "world";
+	pose_msg.header.stamp = current_time;
 
-	pose.pose.orientation.x = world_pose_.orientation.x();
-	pose.pose.orientation.y = world_pose_.orientation.y();
-	pose.pose.orientation.z = world_pose_.orientation.z();
-	pose.pose.orientation.w = world_pose_.orientation.w();
+	pose_msg.pose.orientation.x = pose.orientation.x();
+	pose_msg.pose.orientation.y = pose.orientation.y();
+	pose_msg.pose.orientation.z = pose.orientation.z();
+	pose_msg.pose.orientation.w = pose.orientation.w();
 
-	pose.pose.position.x = world_pose_.position.x();
-	pose.pose.position.y = world_pose_.position.y();
-	pose.pose.position.z = world_pose_.position.z();
+	pose_msg.pose.position.x = pose.position.x();
+	pose_msg.pose.position.y = pose.position.y();
+	pose_msg.pose.position.z = pose.position.z();
 
-	pelvis_pose_pub_.publish(pose);
+	pub.publish(pose_msg);
+}
+
+void StateEstimator::publishPelvisWorldPose(ros::Time current_time) {
+	publishPose(world_pose_, pelvis_pose_pub_, current_time);
+}
+
+void StateEstimator::publishGroundPoint(ros::Time current_time) {
+	publishPose(ground_point_, ground_point_pub_, current_time);
 }
 
 void StateEstimator::sysCommandCb(const std_msgs::StringConstPtr& msg) {
