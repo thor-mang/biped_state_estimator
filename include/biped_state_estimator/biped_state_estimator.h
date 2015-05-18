@@ -81,6 +81,7 @@ private:
 	ros::Subscriber syscmd_sub_;
 
 	bool initialized_;
+	bool resetted_;
 
 	ros::NodeHandle nh_;				// Node handle in which the state estimator is running
 	Pose world_pose_;						// Pose of the robot pelvis relative to world frame

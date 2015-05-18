@@ -13,6 +13,7 @@ StateEstimator::StateEstimator():
 	height_treshold_passed_(false),
 	height_treshold_(0.0),
 	initialized_(false),
+	resetted_(false),
 	ankle_z_offset_(0.0),
 	yaw_(0.0)
 {}
@@ -40,6 +41,7 @@ bool StateEstimator::init(ros::NodeHandle nh, bool reset_on_start) {
 
 	ROS_INFO("State estimation initialized.");
 	initialized_ = true;
+	resetted_ = false;
 	if (reset_on_start) {
 		reset();
 	}
@@ -73,7 +75,7 @@ std::string StateEstimator::getSupportFoot() {
 
 // Update
 void StateEstimator::update(ros::Time current_time) {
-	if (!initialized_) return;
+	if (!initialized_ || !resetted_) return;
 
 	if (checkSupportFootChange()) {
 		setSupportFoot(otherFoot(support_foot_));
@@ -97,6 +99,7 @@ void StateEstimator::update() {
 // Private
 void StateEstimator::reset() {
 	if (initialized_) {
+		resetted_ = true;
 		height_treshold_passed_ = false;
 		// Init state estimation
 		support_foot_ = left_foot_name_; // Starting in double support
