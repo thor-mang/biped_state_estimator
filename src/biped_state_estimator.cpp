@@ -80,10 +80,10 @@ void StateEstimator::update(ros::Time current_time) {
 	}
 
 	Eigen::Affine3d pelvis_to_support_foot = robot_transforms_ptr_->getTransform(support_foot_);
-	world_pose_.orientation = imu_.orientation * ground_point_.orientation * pelvis_to_support_foot.linear().inverse();
+	world_pose_.orientation = ground_point_.orientation * pelvis_to_support_foot.linear().inverse() * imu_.orientation;
 
 	Eigen::Vector3d support_foot_to_pelvis_trans = -pelvis_to_support_foot.translation();
-	world_pose_.position = ground_point_.position + imu_.orientation * support_foot_to_pelvis_trans;
+	world_pose_.position = ground_point_.position + support_foot_to_pelvis_trans;//ground_point_.position + imu_.orientation * support_foot_to_pelvis_trans;
 
 	publishPelvisWorldPose(current_time);
 	publishGroundPoint(current_time);
@@ -101,7 +101,7 @@ void StateEstimator::reset() {
 		// Init state estimation
 		support_foot_ = left_foot_name_; // Starting in double support
 		world_pose_ = Pose();
-		ground_point_.orientation = Eigen::Quaterniond::Identity(); //imu_.orientation * robot_transforms_ptr_->getTransform(left_foot_name_).linear();
+		ground_point_.orientation = Eigen::Quaterniond::Identity();
 		// ROS_INFO_STREAM("Initializing orientation to: " << ground_point_.orientation.x() << ", " <<  ground_point_.orientation.y() << ", " <<  ground_point_.orientation.z() << ", " <<  ground_point_.orientation.w());
 		ground_point_.position = imu_.orientation * robot_transforms_ptr_->getTransform(left_foot_name_).translation();
 		ground_point_.position.z() = ankle_z_offset_;
