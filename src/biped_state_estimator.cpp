@@ -130,7 +130,6 @@ bool StateEstimator::checkSupportFootChange() {
 	std::string lower_foot = difference < 0 ? left_foot_name_ : right_foot_name_;
 	if (std::abs(difference) > height_treshold_ && !height_treshold_passed_) {
 		height_treshold_passed_ = true;
-		// ROS_INFO_STREAM("Height threshold passed.");
 	}
 	if (lower_foot != support_foot_ && height_treshold_passed_) {
 		height_treshold_passed_ = false;
@@ -157,7 +156,7 @@ void StateEstimator::setSupportFoot(std::string foot_name) {
 
 	ground_point_.orientation = Eigen::AngleAxisd(yaw_, Eigen::Vector3d::UnitZ());
 
-	ROS_INFO_STREAM("Switching support foot from " << support_foot_ << " to " << foot_name << ".");
+	// ROS_INFO_STREAM("Switching support foot from " << support_foot_ << " to " << foot_name << ".");
 	support_foot_ = foot_name;
 }
 
