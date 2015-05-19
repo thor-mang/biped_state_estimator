@@ -12,4 +12,12 @@
     <!--<param name="tf_prefix" value="ground_truth" />-->
   </node>
 
+	<node pkg="message_to_tf" type="message_to_tf" name="foot_frame_to_tf" output="screen">
+    <param name="frame_id" value="world" />
+    <param name="footprint_frame_id" value="foot_frame_base_footprint2" />
+		<param name="stabilized_frame_id" value="foot_frame_stabilized" />
+		<param name="child_frame_id" value="footstep_frame" />
+		<param name="topic" value="/state_estimator/ground_point" />
+	</node>
+
 </launch>
