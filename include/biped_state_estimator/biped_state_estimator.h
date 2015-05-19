@@ -14,11 +14,11 @@
 
 typedef struct IMU
 {
-		IMU() : orientation(1.0,0.0,0.0,0.0),angular_velocity(0.0,0.0,0.0),linear_acceleration(0.0,0.0,0.0){}
+		IMU() : roll(0), pitch(0), yaw(0){}
 
-		Eigen::Quaterniond orientation;
-		Eigen::Vector3d angular_velocity;
-		Eigen::Vector3d linear_acceleration;
+		double roll;
+		double pitch;
+		double yaw;
 
 		EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -53,7 +53,8 @@ public:
 	 * @brief setIMU
 	 * @param orientation Orientation as quaternion(x,y,z,w)
 	 */
-	void setIMU(double (&orientation)[4], double (&angular_velocity)[3], double (&linear_acceleration)[3]);
+	//void setIMU(double (&orientation)[4], double (&angular_velocity)[3], double (&linear_acceleration)[3]);
+	void setIMU(double roll, double pitch, double yaw);
 	void setRobotTransforms(boost::shared_ptr<robot_tools::RobotTransforms> transforms_ptr);
 
 	// Output
@@ -73,11 +74,17 @@ private:
 
 	void publishPelvisWorldPose(ros::Time current_time);
 	void publishGroundPoint(ros::Time current_time);
-	void publishPose(const Pose& pose, const ros::Publisher& pub, ros::Time current_time) const;
+	void publishCOM(ros::Time current_time);
+	void publishPose(const Pose& pose, const ros::Publisher& pub, ros::Time current_time, std::string frame = "world") const;
 	void sysCommandCb(const std_msgs::StringConstPtr& msg);
+
+	Eigen::Quaterniond imuToRot(IMU imu) const;
+	Eigen::Quaterniond rpyToRot(double roll, double pitch, double yaw) const;
+	Eigen::Vector3d rotToRpy(Eigen::Matrix3d rot) const;
 
 	ros::Publisher pelvis_pose_pub_;
 	ros::Publisher ground_point_pub_;
+	ros::Publisher com_pub_;
 	ros::Subscriber syscmd_sub_;
 
 	bool initialized_;

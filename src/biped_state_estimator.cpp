@@ -37,6 +37,7 @@ bool StateEstimator::init(ros::NodeHandle nh, bool reset_on_start) {
 
 	pelvis_pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("pelvis_pose", 1000);
 	ground_point_pub_ = nh.advertise<geometry_msgs::PoseStamped>("ground_point", 1000);
+	com_pub_ = nh.advertise<geometry_msgs::PoseStamped>("com", 1000);
 	syscmd_sub_ = nh.subscribe<std_msgs::String>("/syscommand", 1000, &StateEstimator::sysCommandCb, this);
 
 	ROS_INFO("State estimation initialized.");
@@ -48,16 +49,34 @@ bool StateEstimator::init(ros::NodeHandle nh, bool reset_on_start) {
 	return true;
 }
 
+void StateEstimator::reset() {
+	if (initialized_) {
+		resetted_ = true;
+		height_treshold_passed_ = false;
+		// Init state estimation
+		support_foot_ = left_foot_name_; // Starting in double support
+		world_pose_ = Pose();
+		ground_point_.orientation = Eigen::Quaterniond::Identity();
+		// ROS_INFO_STREAM("Initializing orientation to: " << ground_point_.orientation.x() << ", " <<  ground_point_.orientation.y() << ", " <<  ground_point_.orientation.z() << ", " <<  ground_point_.orientation.w());
+		ground_point_.position = imuToRot(imu_) * robot_transforms_ptr_->getTransform(left_foot_name_).translation();
+		ground_point_.position.z() = ankle_z_offset_;
+		yaw_ = 0.0;
+		ROS_INFO_STREAM("[StateEstimator] Reset.");
+	} else {
+		ROS_WARN("Can't reset state estimation before init() was called!");
+	}
+}
+
 // Input
 void StateEstimator::setFeetForceZ(const double& left_z, const double& right_z) {
 	left_force_ = left_z;
 	right_force_ = right_z;
 }
 
-void StateEstimator::setIMU(double (&orientation_no_yaw)[4], double (&angular_velocity)[3], double (&linear_acceleration)[3]) {
-	imu_.orientation = Eigen::Quaterniond(orientation_no_yaw[3], orientation_no_yaw[0], orientation_no_yaw[1], orientation_no_yaw[2]);
-	imu_.angular_velocity = Eigen::Vector3d(angular_velocity[0], angular_velocity[1], angular_velocity[2]);
-	imu_.linear_acceleration = Eigen::Vector3d(linear_acceleration[0], linear_acceleration[1], linear_acceleration[2]);
+void StateEstimator::setIMU(double roll, double pitch, double yaw) {
+	imu_.roll = roll;
+	imu_.pitch = pitch;
+	imu_.yaw = 0;
 }
 
 void StateEstimator::setRobotTransforms(boost::shared_ptr<RobotTransforms> transforms_ptr) {
@@ -80,15 +99,30 @@ void StateEstimator::update(ros::Time current_time) {
 	if (checkSupportFootChange()) {
 		setSupportFoot(otherFoot(support_foot_));
 	}
-
+	// ROS_INFO_STREAM("imu: " << imu_.orientation.x() << ", " << imu_.orientation.y()  << ", " << imu_.orientation.z()  << ", " << imu_.orientation.w());
 	Eigen::Affine3d pelvis_to_support_foot = robot_transforms_ptr_->getTransform(support_foot_);
-	world_pose_.orientation = ground_point_.orientation * pelvis_to_support_foot.linear().inverse() * imu_.orientation;
+
+	double roll, pitch, yaw;
+	roll = imu_.roll;
+	pitch = imu_.pitch;
+	yaw = yaw_ + rotToRpy(pelvis_to_support_foot.rotation().inverse())(2);
+
+	world_pose_.orientation = rpyToRot(roll, pitch, yaw);
+	// ROS_INFO_STREAM("pose imu: " << world_pose_.orientation.x() << ", " << world_pose_.orientation.y()  << ", " << world_pose_.orientation.z()  << ", " << world_pose_.orientation.w());
+	//Eigen::Quaterniond rot_no_imu = ground_point_.orientation * pelvis_to_support_foot.linear().inverse();
+	//world_pose_.orientation = ground_point_.orientation * pelvis_to_support_foot.linear().inverse();
+	//ROS_INFO_STREAM("pose no imu: " << world_pose_.orientation.x() << ", " << world_pose_.orientation.y()  << ", " << world_pose_.orientation.z()  << ", " << world_pose_.orientation.w());
+	//ROS_INFO_STREAM("pose no imu: " << rot_no_imu.x() << ", " << rot_no_imu.y()  << ", " << rot_no_imu.z()  << ", " << rot_no_imu.w());
 
 	Eigen::Vector3d support_foot_to_pelvis_trans = -pelvis_to_support_foot.translation();
-	world_pose_.position = ground_point_.position + support_foot_to_pelvis_trans;//ground_point_.position + imu_.orientation * support_foot_to_pelvis_trans;
+	//world_pose_.position = ground_point_.position + support_foot_to_pelvis_trans;//ground_point_.position + imu_.orientation * support_foot_to_pelvis_trans;
+
+	// translate the pelvis by distance between (fixed) foot frame and actual support foot position in world frame
+	world_pose_.position += ground_point_.position - (world_pose_.orientation * pelvis_to_support_foot.translation() + world_pose_.position);
 
 	publishPelvisWorldPose(current_time);
 	publishGroundPoint(current_time);
+	publishCOM(current_time);
 }
 
 void StateEstimator::update() {
@@ -97,24 +131,6 @@ void StateEstimator::update() {
 
 
 // Private
-void StateEstimator::reset() {
-	if (initialized_) {
-		resetted_ = true;
-		height_treshold_passed_ = false;
-		// Init state estimation
-		support_foot_ = left_foot_name_; // Starting in double support
-		world_pose_ = Pose();
-		ground_point_.orientation = Eigen::Quaterniond::Identity();
-		// ROS_INFO_STREAM("Initializing orientation to: " << ground_point_.orientation.x() << ", " <<  ground_point_.orientation.y() << ", " <<  ground_point_.orientation.z() << ", " <<  ground_point_.orientation.w());
-		ground_point_.position = imu_.orientation * robot_transforms_ptr_->getTransform(left_foot_name_).translation();
-		ground_point_.position.z() = ankle_z_offset_;
-		yaw_ = 0.0;
-		ROS_INFO_STREAM("[StateEstimator] Reset.");
-	} else {
-		ROS_WARN("Can't reset state estimation before init() was called!");
-	}
-}
-
 bool StateEstimator::checkSupportFootChange() {
 	double left_height = getFootHeight(left_foot_name_);
 	double right_height = getFootHeight(right_foot_name_);
@@ -148,18 +164,17 @@ void StateEstimator::setSupportFoot(std::string foot_name) {
 	ground_point_.position.z() =  + ankle_z_offset_; // fix foot to ground again
 
 	// extract yaw
-	Eigen::Quaterniond foot_rot_quad(foot_to_foot.rotation());
-	KDL::Rotation rot = KDL::Rotation::Quaternion(foot_rot_quad.x(), foot_rot_quad.y(), foot_rot_quad.z(), foot_rot_quad.w());
-	double roll, pitch, yaw;
-	rot.GetRPY(roll, pitch, yaw);
-	yaw_ += yaw;
+//	Eigen::Quaterniond foot_rot_quad(foot_to_foot.rotation());
+//	KDL::Rotation rot = KDL::Rotation::Quaternion(foot_rot_quad.x(), foot_rot_quad.y(), foot_rot_quad.z(), foot_rot_quad.w());
+//	double roll, pitch, yaw;
+//	rot.GetRPY(roll, pitch, yaw);
+	yaw_ += rotToRpy(foot_to_foot.rotation())(2);
 
 	ground_point_.orientation = Eigen::AngleAxisd(yaw_, Eigen::Vector3d::UnitZ());
 
 	//Eigen::Vector3d d = robot_transforms_ptr_->getTransform(support_foot_, foot_name).translation();
 	ROS_INFO_STREAM("Switching support foot from " << support_foot_ << " to " << foot_name << "."); // << std::endl <<
 	//								"Displacement: " << std::endl << d.x() << ", " << d.y() << ", " << d.z());
-	ROS_INFO_STREAM("rpy: " << roll << ", " << pitch << ", " << yaw);
 	support_foot_ = foot_name;
 }
 
@@ -167,13 +182,13 @@ void StateEstimator::setSupportFoot(std::string foot_name) {
 double StateEstimator::getFootHeight(std::string foot_name) {
 	Eigen::Affine3d pose	= robot_transforms_ptr_->getTransform(foot_name);
 	Eigen::Vector3d position = pose.translation();
-	Eigen::Vector3d world_position = imu_.orientation * position;
+	Eigen::Vector3d world_position = imuToRot(imu_) * position;
 	return world_position.z();
 }
 
-void StateEstimator::publishPose(const Pose& pose, const ros::Publisher& pub, ros::Time current_time) const {
+void StateEstimator::publishPose(const Pose& pose, const ros::Publisher& pub, ros::Time current_time, std::string frame) const {
 	geometry_msgs::PoseStamped pose_msg;
-	pose_msg.header.frame_id = "world";
+	pose_msg.header.frame_id = frame;
 	pose_msg.header.stamp = current_time;
 
 	pose_msg.pose.orientation.x = pose.orientation.x();
@@ -196,12 +211,44 @@ void StateEstimator::publishGroundPoint(ros::Time current_time) {
 	publishPose(ground_point_, ground_point_pub_, current_time);
 }
 
+void StateEstimator::publishCOM(ros::Time current_time) {
+	Eigen::Affine3d pelvis_to_support_foot = robot_transforms_ptr_->getTransform(support_foot_);
+	Pose com_pose;
+	com_pose.position = -pelvis_to_support_foot.translation();
+	com_pose.position.z() = 0;
+	com_pose.orientation = pelvis_to_support_foot.linear().inverse() * imuToRot(imu_);
+	publishPose(com_pose, com_pub_, current_time, "footstep_frame");
+}
+
 void StateEstimator::sysCommandCb(const std_msgs::StringConstPtr& msg) {
 	if (msg->data == "reset") {
 		reset();
 	} else {
 		ROS_WARN_STREAM("[StateEstimator] Unknown syscommand '" << msg->data << "'.");
 	}
+}
+
+Eigen::Quaterniond StateEstimator::imuToRot(IMU imu) const {
+	return rpyToRot(imu.roll, imu.pitch, imu.yaw);
+}
+
+Eigen::Quaterniond StateEstimator::rpyToRot(double roll, double pitch, double yaw) const {
+//	Eigen::Quaterniond rot = Eigen::AngleAxisd(roll, Eigen::Vector3d::UnitZ())
+//											* Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitY())
+//											* Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitX());
+//	return rot;
+	KDL::Rotation kdl_rot = KDL::Rotation::RPY(roll, pitch, yaw);
+	Eigen::Quaterniond quat;
+	kdl_rot.GetQuaternion(quat.x(), quat.y(), quat.z(), quat.w());
+	return quat;
+}
+
+Eigen::Vector3d StateEstimator::rotToRpy(Eigen::Matrix3d rot) const {
+	Eigen::Quaterniond rot_quad(rot);
+	KDL::Rotation kdl_rot = KDL::Rotation::Quaternion(rot_quad.x(), rot_quad.y(), rot_quad.z(), rot_quad.w());
+	double roll, pitch, yaw;
+	kdl_rot.GetRPY(roll, pitch, yaw);
+	return Eigen::Vector3d(roll, pitch, yaw);
 }
 
 } // namespace Thor

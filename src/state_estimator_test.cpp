@@ -24,31 +24,7 @@ void imu_cb(const sensor_msgs::ImuConstPtr& imu_ptr) {
 	KDL::Rotation rot = KDL::Rotation::Quaternion(imu_ptr->orientation.x, imu_ptr->orientation.y, imu_ptr->orientation.z, imu_ptr->orientation.w);
 	double roll, pitch, yaw;
 	rot.GetRPY(roll, pitch, yaw);
-	// ROS_INFO_STREAM("imu rpy: " << roll << ", " << pitch << ", " << yaw);
-	double orientation[4];
-	KDL::Rotation no_yaw = KDL::Rotation::RPY(roll, pitch, 0);
-	no_yaw.GetQuaternion(orientation[0], orientation[1], orientation[2], orientation[3]);
-//	Eigen::Quaterniond rot(imu_ptr->orientation.w, imu_ptr->orientation.x, imu_ptr->orientation.y, imu_ptr->orientation.z);
-//	Eigen::Matrix3d rot_mat(rot);
-//	Eigen::Vector3d rpy = rot_mat.eulerAngles(0, 1, 2);
-//	Eigen::Quaterniond rot_no_yaw = Eigen::AngleAxisd(rpy(0),		Eigen::Vector3d::UnitX())
-//																* Eigen::AngleAxisd(rpy(1),		Eigen::Vector3d::UnitY())
-//																* Eigen::AngleAxisd(0.0,			Eigen::Vector3d::UnitZ());
-//	double orientation[4];
-//	orientation[0] = rot_no_yaw.x();
-//	orientation[1] = rot_no_yaw.y();
-//	orientation[2] = rot_no_yaw.z();
-//	orientation[3] = rot_no_yaw.w();
-
-	double linear_acc[3], angular_velocity[3];
-	linear_acc[0] = imu_ptr->linear_acceleration.x;
-	linear_acc[1] = imu_ptr->linear_acceleration.y;
-	linear_acc[2] = imu_ptr->linear_acceleration.z;
-
-	angular_velocity[0] = imu_ptr->angular_velocity.x;
-	angular_velocity[1] = imu_ptr->angular_velocity.y;
-	angular_velocity[2] = imu_ptr->angular_velocity.z;
-//	estimator_ptr->setIMU(orientation, angular_velocity, linear_acc);
+	estimator_ptr->setIMU(roll, pitch, yaw);
 	got_imu = true;
 }
 
