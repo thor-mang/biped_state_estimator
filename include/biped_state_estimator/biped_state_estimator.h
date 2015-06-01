@@ -7,10 +7,14 @@
 #include <boost/shared_ptr.hpp>
 #include <geometry_msgs/PoseStamped.h>
 #include <std_msgs/String.h>
+#include <visualization_msgs/MarkerArray.h>
 
 
 #include <cmath>
 
+namespace Eigen {
+	typedef Eigen::Matrix<double, 6, 1> Vector6d;
+}
 
 typedef struct IMU
 {
@@ -59,6 +63,8 @@ public:
 
 	// Output
 	Pose getPelvisPose();
+	Pose getCOMinFootFrame();
+	Eigen::Vector6d getCOMinFootFrameRPY();
 	std::string getSupportFoot();
 
 	// Update
@@ -75,7 +81,7 @@ private:
 	void publishPelvisWorldPose(ros::Time current_time);
 	void publishGroundPoint(ros::Time current_time);
 	void publishCOM(ros::Time current_time);
-	void publishPose(const Pose& pose, const ros::Publisher& pub, ros::Time current_time, std::string frame = "world") const;
+  void publishPose(const Pose& pose, const ros::Publisher& pub, ros::Time current_time, std::string frame = "world", bool add_to_array=false);
 	void sysCommandCb(const std_msgs::StringConstPtr& msg);
 
 	Eigen::Quaterniond imuToRot(IMU imu) const;
@@ -85,6 +91,7 @@ private:
 	ros::Publisher pelvis_pose_pub_;
 	ros::Publisher ground_point_pub_;
 	ros::Publisher com_pub_;
+  ros::Publisher footstep_vis_pub_;
 	ros::Subscriber syscmd_sub_;
 
 	bool initialized_;
@@ -110,6 +117,8 @@ private:
 	double right_force_;
 	boost::shared_ptr<robot_tools::RobotTransforms> robot_transforms_ptr_; // Calculates forward kinematics
 	IMU imu_;																								// IMU data
+
+  unsigned int id_;
 };
 }
 
