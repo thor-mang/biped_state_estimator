@@ -172,7 +172,7 @@ void StateEstimator::setSupportFoot(std::string foot_name) {
   yaw_ += rotToRpy(foot_to_foot.rotation())(2);
 	ground_point_.orientation = Eigen::AngleAxisd(yaw_, Eigen::Vector3d::UnitZ());
 
-  ROS_INFO_STREAM("Switching support foot to " << foot_name << ".");
+  // ROS_INFO_STREAM("Switching support foot to " << foot_name << ".");
 	support_foot_ = foot_name;
 }
 
@@ -204,7 +204,7 @@ void StateEstimator::publishPose(const Pose& pose, const ros::Publisher& pub, ro
     visualization_msgs::Marker pose_marker;
     pose_marker.id = id_++;
     pose_marker.header.frame_id = frame;
-    pose_marker.header.stamp = ros::Time();
+    pose_marker.header.stamp = current_time;
     pose_marker.pose = pose_msg.pose;
     pose_marker.pose.position.z -= ankle_z_offset_;
     geometry_msgs::Vector3 scale;
