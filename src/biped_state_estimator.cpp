@@ -239,7 +239,7 @@ void StateEstimator::publishCOM(ros::Time current_time) {
 }
 
 void StateEstimator::sysCommandCb(const std_msgs::StringConstPtr& msg) {
-	if (msg->data == "reset") {
+  if (msg->data == "reset_pose_estimation") {
 		reset();
 	} else {
 		ROS_WARN_STREAM("[StateEstimator] Unknown syscommand '" << msg->data << "'.");
