@@ -249,8 +249,11 @@ void StateEstimator::publishCOM(ros::Time current_time) {
 	com_pose.orientation = ground_point_.orientation.inverse() * world_pose_.orientation;
 	publishPose(com_pose, com_pub_, current_time, "footstep_frame");
 
-  com_pose.position.z() = -ankle_z_offset_;
-  publishPose(com_pose, ground_com_pub_, current_time, "footstep_frame");
+  Pose ground_com;
+  ground_com.position = world_pose_.position + (world_pose_.orientation * com_offset_);
+  ground_com.orientation = world_pose_.orientation;
+  ground_com.position.z() = 0;
+  publishPose(ground_com, ground_com_pub_, current_time, "world");
 }
 
 void StateEstimator::sysCommandCb(const std_msgs::StringConstPtr& msg) {
