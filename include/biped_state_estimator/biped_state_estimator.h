@@ -91,6 +91,7 @@ private:
 	ros::Publisher pelvis_pose_pub_;
 	ros::Publisher ground_point_pub_;
 	ros::Publisher com_pub_;
+  ros::Publisher ground_com_pub_;
   ros::Publisher footstep_vis_pub_;
 	ros::Subscriber syscmd_sub_;
 
@@ -104,6 +105,8 @@ private:
 	double height_treshold_;		// The non-supporting foot has to pass this limit before it can be a supporting foot again
 	double ankle_z_offset_;
 	Pose ground_point_;					// Contact point of the robot with the world. Moves with each step.
+
+  Eigen::Vector3d com_offset_;
 
 	bool height_treshold_passed_;				// True if the non-supporting foot was higher than the threshold relative to the supporting foot
 

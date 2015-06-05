@@ -5,5 +5,7 @@
 
    <param name="/robot_description" command="$(find xacro)/xacro.py '$(find thor_mang_tud_description)/robots/$(optenv THOR_ROBOT_TYPE thor_mang)_tud_simple.urdf.xacro'" />
 
-  <node name="state_estimator" pkg="biped_state_estimator" type="state_estimator_test" output="screen"/>
+  <node name="state_estimator" pkg="biped_state_estimator" type="state_estimator_test" output="screen">
+      <rosparam file="$(find biped_state_estimator)/config/state_estimator.config"/>   
+  </node>
 </launch>

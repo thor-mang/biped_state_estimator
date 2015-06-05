@@ -32,6 +32,17 @@ bool StateEstimator::init(ros::NodeHandle nh, bool reset_on_start) {
   nh.param("height_treshold", height_treshold_, 0.02); // 0.05
 	nh.param("ankle_z_offset", ankle_z_offset_, 0.118);
 
+  std::vector<double> com_offset;
+  nh.param("com_offset", com_offset, std::vector<double>(3, 0));
+  if (com_offset.size() != 3) {
+    ROS_ERROR_STREAM("[StateEstimation] Com offset needs to have size 3. Received size " << com_offset.size());
+    com_offset_ = Eigen::Vector3d::Zero();
+  } else {
+    for (unsigned int i = 0; i < 3; i++) {
+      com_offset_(i) = com_offset[i];
+    }
+  }
+
 	left_force_ = 0;
 	right_force_ = 0;
 	imu_ = IMU();
@@ -40,6 +51,7 @@ bool StateEstimator::init(ros::NodeHandle nh, bool reset_on_start) {
 	ground_point_pub_ = nh.advertise<geometry_msgs::PoseStamped>("ground_point", 1000);
   footstep_vis_pub_ = nh.advertise<visualization_msgs::MarkerArray>("footsteps", 1000);
 	com_pub_ = nh.advertise<geometry_msgs::PoseStamped>("com", 1000);
+  ground_com_pub_ = nh.advertise<geometry_msgs::PoseStamped>("ground_com", 1000);
 	syscmd_sub_ = nh.subscribe<std_msgs::String>("/syscommand", 1000, &StateEstimator::sysCommandCb, this);
 
 	ROS_INFO("State estimation initialized.");
@@ -95,7 +107,7 @@ std::string StateEstimator::getSupportFoot() {
 
 Pose StateEstimator::getCOMinFootFrame() {
 	Pose com_pose;
-	com_pose.position = world_pose_.position - ground_point_.position;
+  com_pose.position = world_pose_.position - ground_point_.position + (world_pose_.orientation * com_offset_);
 	com_pose.orientation = ground_point_.orientation.inverse() * world_pose_.orientation;
 	return com_pose;
 }
@@ -233,9 +245,12 @@ void StateEstimator::publishGroundPoint(ros::Time current_time) {
 
 void StateEstimator::publishCOM(ros::Time current_time) {
 	Pose com_pose;
-	com_pose.position = world_pose_.position - ground_point_.position;
+  com_pose.position = world_pose_.position - ground_point_.position + (world_pose_.orientation * com_offset_);
 	com_pose.orientation = ground_point_.orientation.inverse() * world_pose_.orientation;
 	publishPose(com_pose, com_pub_, current_time, "footstep_frame");
+
+  com_pose.position.z() = -ankle_z_offset_;
+  publishPose(com_pose, ground_com_pub_, current_time, "footstep_frame");
 }
 
 void StateEstimator::sysCommandCb(const std_msgs::StringConstPtr& msg) {
