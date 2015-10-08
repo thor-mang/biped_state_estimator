@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 
 <launch>
-   <param name="/robot_description" command="$(find xacro)/xacro.py '$(find thor_mang_tud_description)/robots/$(optenv THOR_ROBOT_TYPE thor_mang)_tud_simple.urdf.xacro'" />
+   <param name="/robot_description" command="$(find xacro)/xacro.py '$(find thor_mang_description)/robots/$(optenv THOR_ROBOT_TYPE thor_mang)_tud_simple.urdf.xacro'" />
 
  <node pkg="message_to_tf" type="message_to_tf" name="imu_to_tf" output="screen">
     <!--<param name="frame_id" value="base_footprint" />-->
