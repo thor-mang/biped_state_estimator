@@ -21,10 +21,16 @@ void joint_state_cb(const sensor_msgs::JointStateConstPtr& joint_state_ptr) {
 }
 
 void imu_cb(const sensor_msgs::ImuConstPtr& imu_ptr) {
+  // TODO transform to pelvis frame
 	KDL::Rotation rot = KDL::Rotation::Quaternion(imu_ptr->orientation.x, imu_ptr->orientation.y, imu_ptr->orientation.z, imu_ptr->orientation.w);
 	double roll, pitch, yaw;
 	rot.GetRPY(roll, pitch, yaw);
+  roll += M_PI;
+  while(roll > M_PI) {
+    roll -= 2*M_PI;
+  }
 	estimator_ptr->setIMU(roll, pitch, yaw);
+  //std::cout << "roll: " << std::setw(6) << roll << ", pitch: " << std::setw(6) << pitch << std::endl;
 	got_imu = true;
 }
 
@@ -35,15 +41,15 @@ int main(int argc, char** argv) {
 
 	ros::NodeHandle nh("state_estimator");
 
-	joint_state_sub = nh.subscribe("/joint_states", 1000, &joint_state_cb);
-	imu_sub = nh.subscribe("/thor_mang/pelvis_imu", 1000, &imu_cb);
+  joint_state_sub = nh.subscribe("joint_states", 1000, &joint_state_cb);
+  imu_sub = nh.subscribe("pelvis_imu", 1000, &imu_cb);
 
 	transforms_ptr.reset(new robot_tools::RobotTransforms);
 	transforms_ptr->init();
 
 	estimator_ptr.reset(new robot_tools::StateEstimator);
 	estimator_ptr->setRobotTransforms(transforms_ptr);
-	while (!(got_imu && got_joint_states)) {
+  while (!(got_imu && got_joint_states) && ros::ok()) {
 		usleep(8000);
 		ros::spinOnce();
 	}
