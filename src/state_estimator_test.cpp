@@ -25,11 +25,7 @@ void imu_cb(const sensor_msgs::ImuConstPtr& imu_ptr) {
 	KDL::Rotation rot = KDL::Rotation::Quaternion(imu_ptr->orientation.x, imu_ptr->orientation.y, imu_ptr->orientation.z, imu_ptr->orientation.w);
 	double roll, pitch, yaw;
 	rot.GetRPY(roll, pitch, yaw);
-  roll += M_PI;
-  while(roll > M_PI) {
-    roll -= 2*M_PI;
-  }
-	estimator_ptr->setIMU(roll, pitch, yaw);
+  estimator_ptr->setIMU(-roll, -pitch, yaw);
   //std::cout << "roll: " << std::setw(6) << roll << ", pitch: " << std::setw(6) << pitch << std::endl;
 	got_imu = true;
 }
