@@ -22,7 +22,7 @@
 	</node>
 
   <node name="state_estimator" pkg="biped_state_estimator" type="state_estimator_test" output="screen"> 
-    <remap from="~pelvis_imu" to="/sensor/imu/filtered"/>
+    <remap from="~pelvis_imu" to="/johnny5/sensor/imu/filtered"/>
     <remap from="~joint_states"         to="/johnny5/joints/joint_states"/>
     <param name="pelvis_name"           value="pelvis_link"/>
     <param name="right_foot_name"       value="r_leg_foot_link"/>
