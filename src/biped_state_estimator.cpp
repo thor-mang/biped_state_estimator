@@ -30,7 +30,7 @@ bool StateEstimator::init(ros::NodeHandle nh, bool reset_on_start) {
 	nh.param("right_foot_name", right_foot_name_, std::string("r_foot"));
 	nh.param("left_foot_name", left_foot_name_, std::string("l_foot"));
   nh.param("height_treshold", height_treshold_, 0.02); // 0.05
-  nh.param("ankle_z_offset", ankle_z_offset_, 0);
+  nh.param("ankle_z_offset", ankle_z_offset_, 0.0);
 
   std::vector<double> com_offset;
   nh.param("com_offset", com_offset, std::vector<double>(3, 0));
