@@ -186,16 +186,16 @@ void StateEstimator::update() {
 
 // Private
 bool StateEstimator::checkSupportFootChange() {
-	double left_height = getFootHeight(left_foot_name_);
+  double left_height = getFootHeight(left_foot_name_);
 	double right_height = getFootHeight(right_foot_name_);
 
-	double difference = left_height - right_height;
-  //ROS_INFO_STREAM("Height difference: " << difference);
+  double difference = left_height - right_height;
+  // ROS_INFO_STREAM("Height difference: " << difference);
 
 	std::string lower_foot = difference < 0 ? left_foot_name_ : right_foot_name_;
 	if (std::abs(difference) > height_treshold_ && !height_treshold_passed_) {
 		height_treshold_passed_ = true;
-    //ROS_INFO("Threshold passed.");
+    // ROS_INFO("Threshold passed.");
 	}
 	if (lower_foot != support_foot_ && height_treshold_passed_) {
 		height_treshold_passed_ = false;
