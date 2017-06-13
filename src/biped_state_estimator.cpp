@@ -54,6 +54,8 @@ bool StateEstimator::init(ros::NodeHandle nh, bool reset_on_start) {
   ground_com_pub_ = nh.advertise<geometry_msgs::PoseStamped>("ground_com", 1000);
 	syscmd_sub_ = nh.subscribe<std_msgs::String>("/syscommand", 1000, &StateEstimator::sysCommandCb, this);
 
+  imu_orientation_pub_ = nh.advertise<geometry_msgs::PoseStamped>("imu_orientation", 1000);
+
 	ROS_INFO("State estimation initialized.");
 	initialized_ = true;
 	resetted_ = false;
@@ -91,6 +93,42 @@ void StateEstimator::setIMU(double roll, double pitch, double yaw) {
 	imu_.pitch = pitch;
 	imu_.yaw = 0;
 }
+
+void StateEstimator::setIMU(const sensor_msgs::ImuConstPtr& imu_ptr) {
+  Eigen::Affine3d pelvis_to_imu = robot_transforms_ptr_->getTransform(pelvis_name_, imu_ptr->header.frame_id);
+  Eigen::Quaterniond imu(imu_ptr->orientation.w, imu_ptr->orientation.x, imu_ptr->orientation.y, imu_ptr->orientation.z);
+  // we get world -> imu, we want imu -> world
+  imu = imu.inverse();
+
+  // rotate to pelvis frame
+  Eigen::Quaterniond imu_pelvis(pelvis_to_imu.linear() * imu);
+  Eigen::Vector3d rpy = rotToRpy(imu_pelvis.toRotationMatrix());
+
+
+  Eigen::Quaterniond rotZinv;
+  rotZinv = Eigen::AngleAxisd(-rpy(2), Eigen::Vector3d::UnitZ());
+
+  // we want to ignore yaw, so imu_pelvis = rotX * rotY * rotZ * rotZinv
+  imu_pelvis = imu_pelvis * rotZinv;
+  Eigen::Vector3d rpy2 = rotToRpy(imu_pelvis.toRotationMatrix());
+
+  // if robot rolls right, IMU rolls left. so invert
+  imu_.roll = -rpy2(0);
+  imu_.pitch = -rpy2(1);
+  imu_.yaw = 0;
+
+  // publish IMU in pelvis frame
+  geometry_msgs::PoseStamped pose_msg;
+  pose_msg.header.stamp = ros::Time::now(); // overwrite time for debugging purposes
+  pose_msg.header.frame_id = pelvis_name_;
+  pose_msg.pose.orientation.w = imu_pelvis.w();
+  pose_msg.pose.orientation.x = imu_pelvis.x();
+  pose_msg.pose.orientation.y = imu_pelvis.y();
+  pose_msg.pose.orientation.z = imu_pelvis.z();
+
+  imu_orientation_pub_.publish(pose_msg);
+}
+
 
 void StateEstimator::setRobotTransforms(boost::shared_ptr<RobotTransforms> transforms_ptr) {
 	robot_transforms_ptr_ = transforms_ptr;
@@ -152,7 +190,7 @@ bool StateEstimator::checkSupportFootChange() {
 	double right_height = getFootHeight(right_foot_name_);
 
 	double difference = left_height - right_height;
-  // ROS_INFO_STREAM("Height difference: " << difference);
+  //ROS_INFO_STREAM("Height difference: " << difference);
 
 	std::string lower_foot = difference < 0 ? left_foot_name_ : right_foot_name_;
 	if (std::abs(difference) > height_treshold_ && !height_treshold_passed_) {
@@ -193,6 +231,7 @@ double StateEstimator::getFootHeight(std::string foot_name) {
 	Eigen::Affine3d pose	= robot_transforms_ptr_->getTransform(foot_name);
 	Eigen::Vector3d position = pose.translation();
 	Eigen::Vector3d world_position = imuToRot(imu_) * position;
+  //ROS_INFO_STREAM("Foot height: " << foot_name << ": " << world_position.z());
 	return world_position.z();
 }
 
@@ -279,6 +318,10 @@ Eigen::Vector3d StateEstimator::rotToRpy(Eigen::Matrix3d rot) const {
 	double roll, pitch, yaw;
 	kdl_rot.GetRPY(roll, pitch, yaw);
 	return Eigen::Vector3d(roll, pitch, yaw);
+}
+
+bool StateEstimator::isInitialized() const {
+  return initialized_;
 }
 
 } // namespace Thor

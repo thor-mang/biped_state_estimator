@@ -8,7 +8,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <std_msgs/String.h>
 #include <visualization_msgs/MarkerArray.h>
-
+#include <sensor_msgs/Imu.h>
 
 #include <cmath>
 
@@ -59,6 +59,8 @@ public:
 	 */
 	//void setIMU(double (&orientation)[4], double (&angular_velocity)[3], double (&linear_acceleration)[3]);
 	void setIMU(double roll, double pitch, double yaw);
+  void setIMU(const sensor_msgs::ImuConstPtr& imu_ptr);
+
 	void setRobotTransforms(boost::shared_ptr<robot_tools::RobotTransforms> transforms_ptr);
 
 	// Output
@@ -66,6 +68,9 @@ public:
 	Pose getCOMinFootFrame();
 	Eigen::Vector6d getCOMinFootFrameRPY();
 	std::string getSupportFoot();
+
+  // Getters
+  bool isInitialized() const;
 
 	// Update
 	void update();
@@ -93,6 +98,7 @@ private:
 	ros::Publisher com_pub_;
   ros::Publisher ground_com_pub_;
   ros::Publisher footstep_vis_pub_;
+  ros::Publisher imu_orientation_pub_;
 	ros::Subscriber syscmd_sub_;
 
 	bool initialized_;
