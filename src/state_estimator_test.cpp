@@ -9,6 +9,7 @@ boost::shared_ptr<robot_tools::RobotTransforms> transforms_ptr;
 boost::shared_ptr<robot_tools::StateEstimator> estimator_ptr;
 ros::Subscriber joint_state_sub;
 ros::Subscriber imu_sub;
+
 bool got_imu = false;
 bool got_joint_states = false;
 
@@ -28,7 +29,6 @@ void imu_cb(const sensor_msgs::ImuConstPtr& imu_ptr) {
     estimator_ptr->setIMU(imu_ptr);
   }
 }
-
 
 
 int main(int argc, char** argv) {

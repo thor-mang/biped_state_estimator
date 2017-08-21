@@ -27,6 +27,7 @@ bool StateEstimator::init(ros::NodeHandle nh, bool reset_on_start) {
 	// Load params
 	nh_ = nh;
 	nh.param("pelvis_name", pelvis_name_, std::string("pelvis"));
+  nh.param("imu_world_frame", imu_world_frame_, std::string("imu_world_frame"));
 	nh.param("right_foot_name", right_foot_name_, std::string("r_foot"));
 	nh.param("left_foot_name", left_foot_name_, std::string("l_foot"));
   nh.param("height_treshold", height_treshold_, 0.02); // 0.05
@@ -73,7 +74,7 @@ void StateEstimator::reset() {
 		support_foot_ = left_foot_name_; // Starting in double support
 		world_pose_ = Pose();
 		ground_point_.orientation = Eigen::Quaterniond::Identity();
-		ground_point_.position = imuToRot(imu_) * robot_transforms_ptr_->getTransform(left_foot_name_).translation();
+    ground_point_.position = imuToRot(imu_) * robot_transforms_ptr_->getTransform(pelvis_name_, left_foot_name_).translation();
 		ground_point_.position.z() = ankle_z_offset_;
 		yaw_ = 0.0;
 		ROS_INFO_STREAM("[StateEstimator] Reset.");
@@ -95,36 +96,30 @@ void StateEstimator::setIMU(double roll, double pitch, double yaw) {
 }
 
 void StateEstimator::setIMU(const sensor_msgs::ImuConstPtr& imu_ptr) {
-  Eigen::Affine3d pelvis_to_imu = robot_transforms_ptr_->getTransform(pelvis_name_, imu_ptr->header.frame_id);
-  Eigen::Quaterniond imu(imu_ptr->orientation.w, imu_ptr->orientation.x, imu_ptr->orientation.y, imu_ptr->orientation.z);
-  // we get world -> imu, we want imu -> world
-  imu = imu.inverse();
+  // we get world -> imu
+  Eigen::Quaterniond imu(imu_ptr->orientation.w, imu_ptr->orientation.x, imu_ptr->orientation.y, imu_ptr->orientation.z); // ^W R_I
 
   // rotate to pelvis frame
-  Eigen::Quaterniond imu_pelvis(pelvis_to_imu.linear() * imu);
+  Eigen::Affine3d imu_to_pelvis = robot_transforms_ptr_->getTransform(imu_ptr->header.frame_id, pelvis_name_); // ^I R_P
+  Eigen::Quaterniond imu_pelvis(imu * imu_to_pelvis.linear()); // ^W R_P = ^W R_I * ^I R_P
+  imu_pelvis = robot_transforms_ptr_->getTransform(imu_world_frame_).linear() * imu_pelvis; // from IMU world convention (NED, ENU, ..) to our convention
+
+//   we want to ignore yaw
   Eigen::Vector3d rpy = rotToRpy(imu_pelvis.toRotationMatrix());
-
-
-  Eigen::Quaterniond rotZinv;
-  rotZinv = Eigen::AngleAxisd(-rpy(2), Eigen::Vector3d::UnitZ());
-
-  // we want to ignore yaw, so imu_pelvis = rotX * rotY * rotZ * rotZinv
-  imu_pelvis = imu_pelvis * rotZinv;
-  Eigen::Vector3d rpy2 = rotToRpy(imu_pelvis.toRotationMatrix());
-
-  // if robot rolls right, IMU rolls left. so invert
-  imu_.roll = -rpy2(0);
-  imu_.pitch = -rpy2(1);
+  imu_.roll = rpy(0);
+  imu_.pitch = rpy(1);
   imu_.yaw = 0;
 
-  // publish IMU in pelvis frame
+  // publish IMU as pelvis -> world rotation without yaw
+  Eigen::Quaterniond imu_pelvis_no_yaw = rpyToRot(rpy(0), rpy(1), 0).inverse();
+
   geometry_msgs::PoseStamped pose_msg;
   pose_msg.header.stamp = ros::Time::now(); // overwrite time for debugging purposes
   pose_msg.header.frame_id = pelvis_name_;
-  pose_msg.pose.orientation.w = imu_pelvis.w();
-  pose_msg.pose.orientation.x = imu_pelvis.x();
-  pose_msg.pose.orientation.y = imu_pelvis.y();
-  pose_msg.pose.orientation.z = imu_pelvis.z();
+  pose_msg.pose.orientation.w = imu_pelvis_no_yaw.w();
+  pose_msg.pose.orientation.x = imu_pelvis_no_yaw.x();
+  pose_msg.pose.orientation.y = imu_pelvis_no_yaw.y();
+  pose_msg.pose.orientation.z = imu_pelvis_no_yaw.z();
 
   imu_orientation_pub_.publish(pose_msg);
 }
@@ -163,7 +158,7 @@ void StateEstimator::update(ros::Time current_time) {
 		setSupportFoot(otherFoot(support_foot_));
 	}
 
-	Eigen::Affine3d pelvis_to_support_foot = robot_transforms_ptr_->getTransform(support_foot_);
+  Eigen::Affine3d pelvis_to_support_foot = robot_transforms_ptr_->getTransform(pelvis_name_, support_foot_);
 
 	double roll, pitch, yaw;
 	roll = imu_.roll;
@@ -228,7 +223,7 @@ void StateEstimator::setSupportFoot(std::string foot_name) {
 
 
 double StateEstimator::getFootHeight(std::string foot_name) {
-	Eigen::Affine3d pose	= robot_transforms_ptr_->getTransform(foot_name);
+  Eigen::Affine3d pose	= robot_transforms_ptr_->getTransform(pelvis_name_, foot_name);
 	Eigen::Vector3d position = pose.translation();
 	Eigen::Vector3d world_position = imuToRot(imu_) * position;
   //ROS_INFO_STREAM("Foot height: " << foot_name << ": " << world_position.z());
