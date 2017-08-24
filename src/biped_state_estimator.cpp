@@ -27,11 +27,16 @@ bool StateEstimator::init(ros::NodeHandle nh, bool reset_on_start) {
 	// Load params
 	nh_ = nh;
 	nh.param("pelvis_name", pelvis_name_, std::string("pelvis"));
-  nh.param("imu_world_frame", imu_world_frame_, std::string("imu_world_frame"));
-	nh.param("right_foot_name", right_foot_name_, std::string("r_foot"));
+  nh.param("right_foot_name", right_foot_name_, std::string("r_foot"));
 	nh.param("left_foot_name", left_foot_name_, std::string("l_foot"));
   nh.param("height_treshold", height_treshold_, 0.02); // 0.05
   nh.param("ankle_z_offset", ankle_z_offset_, 0.0);
+
+  double roll, pitch, yaw;
+  nh.param("imu_world_roll_offset", roll, 0.0);
+  nh.param("imu_world_pitch_offset", pitch, 0.0);
+  nh.param("imu_world_yaw_offset", yaw, 0.0);
+  imu_world_rotation_offset_ = rpyToRot(roll, pitch, yaw);
 
   std::vector<double> com_offset;
   nh.param("com_offset", com_offset, std::vector<double>(3, 0));
@@ -102,7 +107,7 @@ void StateEstimator::setIMU(const sensor_msgs::ImuConstPtr& imu_ptr) {
   // rotate to pelvis frame
   Eigen::Affine3d imu_to_pelvis = robot_transforms_ptr_->getTransform(imu_ptr->header.frame_id, pelvis_name_); // ^I R_P
   Eigen::Quaterniond imu_pelvis(imu * imu_to_pelvis.linear()); // ^W R_P = ^W R_I * ^I R_P
-  imu_pelvis = robot_transforms_ptr_->getTransform(imu_world_frame_).linear() * imu_pelvis; // from IMU world convention (NED, ENU, ..) to our convention
+  imu_pelvis = imu_world_rotation_offset_ * imu_pelvis; // from IMU world convention (NED, ..) to our convention (ENU)
 
 //   we want to ignore yaw
   Eigen::Vector3d rpy = rotToRpy(imu_pelvis.toRotationMatrix());
