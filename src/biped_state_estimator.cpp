@@ -31,6 +31,7 @@ bool StateEstimator::init(ros::NodeHandle nh, bool reset_on_start) {
 	nh.param("left_foot_name", left_foot_name_, std::string("l_foot"));
   nh.param("height_treshold", height_treshold_, 0.02); // 0.05
   nh.param("ankle_z_offset", ankle_z_offset_, 0.0);
+  nh.param("tf_odom_frame", tf_odom_frame_, std::string("world"));
 
   double roll, pitch, yaw;
   nh.param("imu_world_roll_offset", roll, 0.0);
@@ -101,7 +102,7 @@ void StateEstimator::setIMU(double roll, double pitch, double yaw) {
 }
 
 void StateEstimator::setIMU(const sensor_msgs::ImuConstPtr& imu_ptr) {
-  // we get world -> imu
+  // we get world -> imu (^W R_I)
   Eigen::Quaterniond imu(imu_ptr->orientation.w, imu_ptr->orientation.x, imu_ptr->orientation.y, imu_ptr->orientation.z); // ^W R_I
 
   // rotate to pelvis frame
@@ -275,11 +276,11 @@ void StateEstimator::publishPose(const Pose& pose, const ros::Publisher& pub, ro
 }
 
 void StateEstimator::publishPelvisWorldPose(ros::Time current_time) {
-	publishPose(world_pose_, pelvis_pose_pub_, current_time);
+  publishPose(world_pose_, pelvis_pose_pub_, current_time, tf_odom_frame_, false);
 }
 
 void StateEstimator::publishGroundPoint(ros::Time current_time) {
-  publishPose(ground_point_, ground_point_pub_, current_time, "world", true);
+  publishPose(ground_point_, ground_point_pub_, current_time, tf_odom_frame_, true);
 }
 
 void StateEstimator::publishCOM(ros::Time current_time) {

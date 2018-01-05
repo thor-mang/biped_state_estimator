@@ -118,6 +118,7 @@ private:
 
 	// Parameters
 	std::string pelvis_name_;			// Name of the pelvis
+  std::string tf_odom_frame_;   // Name of tf frame
   std::string imu_world_frame_;
   Eigen::Quaterniond imu_world_rotation_offset_;
 	std::string right_foot_name_; // Name of the right foot

@@ -6,7 +6,6 @@ project(biped_state_estimator)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
-  cmake_modules
   robot_transforms
   geometry_msgs
   sensor_msgs
@@ -16,7 +15,7 @@ add_compile_options(-std=c++11)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(Eigen REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
