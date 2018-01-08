@@ -55,6 +55,7 @@ bool StateEstimator::init(ros::NodeHandle nh, bool reset_on_start) {
 	imu_ = IMU();
 
 	pelvis_pose_pub_ = nh.advertise<geometry_msgs::PoseStamped>("pelvis_pose", 1000);
+  pelvis_odom_pub_ = nh.advertise<nav_msgs::Odometry>("pelvis_odometry", 1000);
 	ground_point_pub_ = nh.advertise<geometry_msgs::PoseStamped>("ground_point", 1000);
   footstep_vis_pub_ = nh.advertise<visualization_msgs::MarkerArray>("footsteps", 1000);
 	com_pub_ = nh.advertise<geometry_msgs::PoseStamped>("com", 1000);
@@ -176,7 +177,8 @@ void StateEstimator::update(ros::Time current_time) {
 	// translate the pelvis by distance between (fixed) foot frame and actual support foot position in world frame
 	world_pose_.position += ground_point_.position - (world_pose_.orientation * pelvis_to_support_foot.translation() + world_pose_.position);
 
-	publishPelvisWorldPose(current_time);
+  publishPelvisWorldPose(current_time);
+  publishPelvisOdometry(current_time);
 	publishGroundPoint(current_time);
 	publishCOM(current_time);
 }
@@ -275,8 +277,38 @@ void StateEstimator::publishPose(const Pose& pose, const ros::Publisher& pub, ro
   }
 }
 
+void StateEstimator::publishOdometry(const Pose& pose, const Twist& twist, const ros::Publisher& pub, ros::Time current_time, std::string frame) {
+  nav_msgs::Odometry odometry_msg;
+  odometry_msg.header.frame_id = frame;
+  odometry_msg.header.stamp = current_time;
+  odometry_msg.child_frame_id = "pelvis_link";
+
+  odometry_msg.pose.pose.orientation.x = pose.orientation.x();
+  odometry_msg.pose.pose.orientation.y = pose.orientation.y();
+  odometry_msg.pose.pose.orientation.z = pose.orientation.z();
+  odometry_msg.pose.pose.orientation.w = pose.orientation.w();
+
+  odometry_msg.pose.pose.position.x = pose.position.x();
+  odometry_msg.pose.pose.position.y = pose.position.y();
+  odometry_msg.pose.pose.position.z = pose.position.z();
+
+  odometry_msg.twist.twist.linear.x = twist.linear.x();
+  odometry_msg.twist.twist.linear.y = twist.linear.y();
+  odometry_msg.twist.twist.linear.z = twist.linear.z();
+
+  odometry_msg.twist.twist.angular.x = twist.angular.x();
+  odometry_msg.twist.twist.angular.y = twist.angular.y();
+  odometry_msg.twist.twist.angular.z = twist.angular.z();
+
+  pub.publish(odometry_msg);
+}
+
 void StateEstimator::publishPelvisWorldPose(ros::Time current_time) {
   publishPose(world_pose_, pelvis_pose_pub_, current_time, tf_odom_frame_, false);
+}
+
+void StateEstimator::publishPelvisOdometry(ros::Time current_time) {
+  publishOdometry(world_pose_, Twist(), pelvis_odom_pub_, current_time, tf_odom_frame_);
 }
 
 void StateEstimator::publishGroundPoint(ros::Time current_time) {

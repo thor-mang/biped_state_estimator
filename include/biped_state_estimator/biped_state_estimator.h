@@ -6,6 +6,7 @@
 #include <robot_transforms/robot_transforms.h>
 #include <boost/shared_ptr.hpp>
 #include <geometry_msgs/PoseStamped.h>
+#include <nav_msgs/Odometry.h>
 #include <std_msgs/String.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <sensor_msgs/Imu.h>
@@ -42,6 +43,21 @@ typedef struct Pose
 		EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 } Pose;
+
+typedef struct Twist
+{
+    Twist() : linear(0.0,0.0,0.0), angular(0.0,0.0,0.0) {}
+    Twist(Eigen::Vector3d linear_, Eigen::Vector3d angular_) {
+      linear = linear_;
+      angular = angular_;
+    }
+
+    Eigen::Vector3d linear;
+    Eigen::Vector3d angular;
+
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+} Twist;
 
 namespace robot_tools {
 class StateEstimator {
@@ -83,17 +99,20 @@ private:
 	double getFootHeight(std::string foot_name);
 	std::string otherFoot(std::string foot_name);
 
-	void publishPelvisWorldPose(ros::Time current_time);
+  void publishPelvisWorldPose(ros::Time current_time);
+  void publishPelvisOdometry(ros::Time current_time);
 	void publishGroundPoint(ros::Time current_time);
-	void publishCOM(ros::Time current_time);
+  void publishCOM(ros::Time current_time);
   void publishPose(const Pose& pose, const ros::Publisher& pub, ros::Time current_time, std::string frame = "world", bool add_to_array=false);
+  void publishOdometry(const Pose& pose, const Twist& twist, const ros::Publisher& pub, ros::Time current_time, std::string frame = "world");
 	void sysCommandCb(const std_msgs::StringConstPtr& msg);
 
 	Eigen::Quaterniond imuToRot(IMU imu) const;
 	Eigen::Quaterniond rpyToRot(double roll, double pitch, double yaw) const;
 	Eigen::Vector3d rotToRpy(Eigen::Matrix3d rot) const;
 
-	ros::Publisher pelvis_pose_pub_;
+  ros::Publisher pelvis_pose_pub_;
+  ros::Publisher pelvis_odom_pub_;
 	ros::Publisher ground_point_pub_;
 	ros::Publisher com_pub_;
   ros::Publisher ground_com_pub_;
